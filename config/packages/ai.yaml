@@ -1,5 +1,9 @@
 ai:
     platform:
+        amazeeai:
+            base_url: '%env(AMAZEEAI_LLM_API_URL)%'
+            api_key: '%env(AMAZEEAI_LLM_KEY)%'
+        # Optional: only used for Speech STT/TTS
         openai:
             api_key: '%env(OPENAI_API_KEY)%'
         huggingface:
@@ -14,8 +18,8 @@ ai:
             # OCR-extracted text is injected, so no static prompt is configured here.
             tools: false
         blog:
-            platform: 'ai.platform.openai'
-            model: 'gpt-4.1'
+            platform: 'ai.platform.amazeeai'
+            model: 'chat'
             prompt: |
                 You are an helpful assistant that knows about the latest blog content of the Symfony's framework website.
                 To search for content you use the tool 'similarity_search' for generating the answer. Only use content
@@ -31,8 +35,8 @@ ai:
             memory:
                 service: 'App\Blog\SymfonyVersionsMemory'
         movies:
-            platform: 'ai.platform.openai'
-            model: 'gpt-4.1'
+            platform: 'ai.platform.amazeeai'
+            model: 'chat_with_complex_json'
             prompt: |
                 You are a friendly movie expert helping users discover films from a curated collection.
 
@@ -49,25 +53,25 @@ ai:
             tools:
                 - 'App\Movies\MovieSearch'
         stream:
-            platform: 'ai.platform.openai'
-            model: 'gpt-4.1'
+            platform: 'ai.platform.amazeeai'
+            model: 'chat'
             prompt:
                 file: '%kernel.project_dir%/prompts/stream-chat.txt'
             tools: false
         youtube:
-            platform: 'ai.platform.openai'
-            model: 'gpt-5-mini'
+            platform: 'ai.platform.amazeeai'
+            model: 'chat'
             tools: false
         recipe:
-            platform: 'ai.platform.openai'
-            model: 'gpt-5-mini'
+            platform: 'ai.platform.amazeeai'
+            model: 'chat_with_complex_json'
             prompt:
                 text: 'You are a helpful cooking assistant. Provide detailed recipes based on user requests.'
             tools: false
         wikipedia:
-            platform: 'ai.platform.openai'
+            platform: 'ai.platform.amazeeai'
             model:
-                name: 'gpt-5-mini'
+                name: 'chat'
             prompt:
                 text: |
                     Please answer the users question based on Wikipedia, only use information provided in the messages.
@@ -77,8 +81,8 @@ ai:
                 - 'Symfony\AI\Agent\Bridge\Wikipedia\Wikipedia'
             include_sources: true
         speech:
-            platform: 'ai.platform.openai'
-            model: 'gpt-5-mini'
+            platform: 'ai.platform.amazeeai'
+            model: 'chat'
             prompt: |
                 You are a friendly, positive and energetic voice assistant. You can engage in light discussions, ask
                 questions, and do general small-talk. If asked about the Symfony Framework or their community events,
@@ -102,8 +106,8 @@ ai:
                     voice: 'coral'
                     instructions: 'Speak in a cheerful and positive tone.'
         mcp:
-            platform: 'ai.platform.openai'
-            model: 'gpt-5-mini'
+            platform: 'ai.platform.amazeeai'
+            model: 'chat'
             prompt:
                 text: |
                     You are a helpful assistant that answers questions about live football, the New York City
@@ -124,18 +128,18 @@ ai:
                 - { mcp_server: 'remotes.weather' }
         # Multi-agent setup
         orchestrator:
-            platform: 'ai.platform.openai'
-            model: 'gpt-5-mini'
+            platform: 'ai.platform.amazeeai'
+            model: 'chat'
             prompt: 'You are an intelligent agent orchestrator that routes user questions to specialized agents.'
             tools: false
         technical:
-            platform: 'ai.platform.openai'
-            model: 'gpt-5-mini'
+            platform: 'ai.platform.amazeeai'
+            model: 'chat'
             prompt: 'You are a technical support specialist. Help users resolve bugs, problems, and technical errors.'
             tools: false
         fallback:
-            platform: 'ai.platform.openai'
-            model: 'gpt-5-mini'
+            platform: 'ai.platform.amazeeai'
+            model: 'chat'
             prompt: 'You are a helpful general assistant. Assist users with any questions or tasks they may have.'
             tools: false
     multi_agent:
@@ -147,13 +151,19 @@ ai:
     store:
         postgres:
             symfony_blog:
-                dbal_connection: 'doctrine.dbal.default_connection'
+                dsn: '%env(AMAZEEAI_VDB_DSN)%'
+                username: '%env(AMAZEEAI_VDB_USER)%'
+                password: '%env(AMAZEEAI_VDB_PASSWORD)%'
                 table_name: 'symfony_blog'
+                vector_field: 'embedding'
                 distance: 'cosine'
+                setup_options:
+                    # Must match the dimensions of the vectorizer model ('embeddings' resolves to mistral-embed)
+                    vector_size: 1024
     vectorizer:
-        openai:
-            platform: 'ai.platform.openai'
-            model: 'text-embedding-ada-002'
+        amazeeai:
+            platform: 'ai.platform.amazeeai'
+            model: 'embeddings'
     indexer:
         blog:
             loader: 'Symfony\AI\Store\Document\Loader\RssFeedLoader'
@@ -163,12 +173,12 @@ ai:
             transformers:
                 - 'Symfony\AI\Store\Document\Transformer\TextSplitTransformer'
                 - 'Symfony\AI\Store\Document\Transformer\TextTrimTransformer'
-            vectorizer: 'ai.vectorizer.openai'
+            vectorizer: 'ai.vectorizer.amazeeai'
             store: 'ai.store.postgres.symfony_blog'
     retriever:
         blog:
             store: 'ai.store.postgres.symfony_blog'
-            vectorizer: 'ai.vectorizer.openai'
+            vectorizer: 'ai.vectorizer.amazeeai'
 
 services:
     _defaults:

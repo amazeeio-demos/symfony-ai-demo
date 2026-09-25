@@ -36,7 +36,7 @@ final class TwigComponent
     public ?string $image = null;
 
     public function __construct(
-        #[Autowire(service: 'ai.platform.openai')]
+        #[Autowire(service: 'ai.platform.amazeeai')]
         private readonly PlatformInterface $platform,
     ) {
     }
@@ -59,8 +59,8 @@ final class TwigComponent
             Message::ofUser($this->instruction, Image::fromDataUrl($this->image))
         );
 
-        $result = $this->platform->invoke('gpt-5.2', $messageBag, [
-            'max_output_tokens' => 100,
+        $result = $this->platform->invoke('chat_with_image_vision', $messageBag, [
+            'max_tokens' => 100,
         ]);
 
         $this->caption = $result->asText();
