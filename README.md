@@ -1,92 +1,138 @@
-# Symfony AI - Demo Application
+# Symfony AI - Demo Application using amazee.ai
 
-Symfony application demoing Symfony AI components.
+Symfony application demoing [Symfony AI](https://symfony.com/doc/current/ai/index.html) components with the
+[amazee.ai](https://amazee.ai/) Private AI Gateway: LLMs and a managed pgvector database, in the region you choose.
+
+This is a fork of [symfony/ai-demo](https://github.com/symfony/ai-demo) where every chat use case runs through
+amazee.ai.
+
+## Quick start
+
+```shell
+git clone https://github.com/amazeeio-demos/symfony-ai-demo.git
+cd symfony-ai-demo
+composer install
+
+# Sends a code to your email, then writes the LLM and vector database credentials to .env.local
+php bin/console ai:amazee:configure you@example.com
+
+# Index the Symfony blog into the amazee.ai vector database
+php bin/console ai:store:setup ai.store.postgres.symfony_blog
+php bin/console ai:store:index blog -vv
+
+symfony serve -d
+```
+
+Open https://localhost:8000/ and start chatting.
+
+> [!NOTE]
+> Without the [Symfony CLI](https://symfony.com/download), use `php -S 127.0.0.1:8000 -t public`
+> (set `PHP_CLI_SERVER_WORKERS=4` so streamed answers don't block other requests) and open http://127.0.0.1:8000/.
 
 ## Examples
 
 ![demo.png](demo.png)
 
+| Use case     | Provider                                         | Model                         |
+|--------------|--------------------------------------------------|-------------------------------|
+| YouTube      | amazee.ai                                        | `chat`                        |
+| Recipe       | amazee.ai                                        | `chat_with_complex_json`      |
+| Movies       | amazee.ai                                        | `chat_with_complex_json`      |
+| Wikipedia    | amazee.ai                                        | `chat`                        |
+| MCP          | amazee.ai                                        | `chat`                        |
+| Symfony Blog | amazee.ai (LLM + vector database)                | `chat` · `embeddings`         |
+| Video        | amazee.ai                                        | `chat_with_image_vision`      |
+| Turbo Stream | amazee.ai                                        | `chat`                        |
+| Speech       | amazee.ai + OpenAI for speech-to-text and text-to-speech | `whisper-1` · `chat` · `tts-1` |
+| Document OCR | Mistral                                          | `mistral-ocr-latest` · `mistral-medium-latest` |
+| Smart Crop   | Hugging Face                                     | `facebook/detr-resnet-50`     |
+
+## Models
+
+`chat`, `chat_with_complex_json`, `chat_with_image_vision` and `embeddings` are aliases that amazee.ai
+resolves in each region, so the demo works whichever region you pick.
+You can use any model your key has access to instead, by changing the `model` of an agent
+in `config/packages/ai.yaml`. List the available models with:
+
+```shell
+curl -s -H "Authorization: Bearer $AMAZEEAI_LLM_KEY" "$AMAZEEAI_LLM_API_URL/v1/models"
+```
+
+The platform bridge discovers these models and their capabilities from the gateway's `/model/info` endpoint,
+so no model catalog needs to be maintained in the application.
+
+> [!IMPORTANT]
+> The vector table is created with `vector_size: 1024`, which matches `embeddings` (Mistral Embed).
+> If you switch to an embedding model with other dimensions, update `setup_options.vector_size` in
+> `config/packages/ai.yaml`, then run `ai:store:drop`, `ai:store:setup` and `ai:store:index` again.
+
 ## Requirements
 
-What you need to run this demo:
-
-* Internet Connection
-* Terminal & Browser
-* [Git](https://git-scm.com/) & [GitHub Account](https://github.com)
-* [Docker](https://www.docker.com/) with [Docker Compose Plugin](https://docs.docker.com/compose/)
-* Your Favorite IDE or Editor
-* An [OpenAI API Key](https://platform.openai.com/docs/api-reference/create-and-export-an-api-key)
-* [Node.js](https://nodejs.org/) - only for the MCP example: one of its three servers speaks the
+* [PHP >= 8.4](https://www.php.net/releases/8.4/en.php) with the `gd`, `intl` and `pdo_pgsql` extensions
+* [Composer](https://getcomposer.org/)
+* An email address to sign in to [amazee.ai](https://amazee.ai/) with `ai:amazee:configure`
+* Optional: the [Symfony CLI](https://symfony.com/download)
+* Optional: [Node.js](https://nodejs.org/), only for the MCP example: one of its three servers speaks the
   legacy HTTP+SSE transport and is reached through `npx mcp-remote`
+* Optional API keys, in `.env.local`, for the use cases that are not served by amazee.ai:
+  * `OPENAI_API_KEY`: speech-to-text and text-to-speech of the Speech example
+  * `MISTRAL_API_KEY`: Document OCR
+  * `HUGGINGFACE_API_KEY`: Smart Crop
+
+## Configuration
+
+`ai:amazee:configure` writes the following to `.env.local`:
+
+```dotenv
+AMAZEEAI_LLM_KEY=sk-...
+AMAZEEAI_LLM_API_URL=https://llm.[region].amazee.ai
+AMAZEEAI_VDB_HOST=vectordb1.[region].amazee.ai
+AMAZEEAI_VDB_PORT=5432
+AMAZEEAI_VDB_NAME=db_abcd1234
+AMAZEEAI_VDB_USER=user_abcd1234
+AMAZEEAI_VDB_PASSWORD=...
+```
+
+`AMAZEEAI_VDB_DSN` is composed from these in `.env`. Check the result with `php bin/console debug:dotenv`.
+
+In production (`APP_ENV=prod`), the command stores `AMAZEEAI_LLM_KEY` and `AMAZEEAI_VDB_PASSWORD` as
+[Symfony secrets](https://symfony.com/doc/current/configuration/secrets.html) instead.
+
+The platform, vector store and agents are wired in `config/packages/ai.yaml`:
+
+```yaml
+ai:
+    platform:
+        amazeeai:
+            base_url: '%env(AMAZEEAI_LLM_API_URL)%'
+            api_key: '%env(AMAZEEAI_LLM_KEY)%'
+    agent:
+        blog:
+            platform: 'ai.platform.amazeeai'
+            model: 'chat'
+    store:
+        postgres:
+            symfony_blog:
+                dsn: '%env(AMAZEEAI_VDB_DSN)%'
+                username: '%env(AMAZEEAI_VDB_USER)%'
+                password: '%env(AMAZEEAI_VDB_PASSWORD)%'
+```
+
+To use amazee.ai in your own project:
+
+```shell
+composer require symfony/ai-bundle symfony/ai-amazee-ai-platform amazeeio/symfony-amazeeai-configure
+php bin/console ai:amazee:configure you@example.com
+```
 
 ## Technology
 
-This small demo sits on top of following technologies:
-
 * [PHP >= 8.4](https://www.php.net/releases/8.4/en.php)
 * [Symfony 8.1 incl. Twig, Asset Mapper & UX](https://symfony.com/)
-* [Bootstrap 5](https://getbootstrap.com/docs/5.0/getting-started/introduction/)
-* [OpenAI's GPT & Embeddings](https://platform.openai.com/docs/overview)
-* [PostgreSQL with pgvector](https://github.com/pgvector/pgvector)
-* [FrankenPHP](https://frankenphp.dev/)
-
-## Setup
-
-The setup is split into three parts, the Symfony application, the OpenAI configuration, and initializing PostgreSQL.
-
-### 1. Symfony App
-
-Checkout the repository, start the docker environment and install dependencies:
-
-```shell
-git clone git@github.com:symfony/ai-demo.git
-cd ai-demo
-composer install
-docker compose up -d
-symfony serve -d
-```
-
-Now you should be able to open https://localhost:8000/ in your browser,
-and the chatbot UI should be available for you to start chatting.
-
-> [!NOTE]
-> You might have to bypass the security warning of your browser with regard to self-signed certificates.
-
-### 2. OpenAI Configuration
-
-For using GPT and embedding models from OpenAI, you need to configure an OpenAI API key as environment variable.
-This requires you to have an OpenAI account, create a valid API key and set it as `OPENAI_API_KEY` in `.env.local` file.
-
-```shell
-echo "OPENAI_API_KEY='sk-...'" > .env.local
-```
-
-Verify the success of this step by running the following command:
-
-```shell
-symfony console debug:dotenv
-```
-
-You should be able to see the `OPENAI_API_KEY` in the list of environment variables.
-
-### 3. PostgreSQL Vector Store Initialization
-
-[PostgreSQL with pgvector](https://github.com/pgvector/pgvector) is used to store embeddings of the chatbot's context.
-
-To initialize the vector store, you need to run the following command:
-
-```shell
-symfony console ai:store:setup ai.store.postgres.symfony_blog
-symfony console ai:store:index blog -vv
-```
-
-Now you should be able to retrieve documents from the store:
-
-```shell
-symfony console ai:store:retrieve blog "Week of Symfony"
-```
-
-**Don't forget to set up the project in your favorite IDE or editor.**
+* [Symfony AI](https://symfony.com/doc/current/ai/index.html) with the
+  [amazee.ai platform bridge](https://github.com/symfony/ai-amazee-ai-platform)
+* [amazee.ai](https://amazee.ai/) LLM gateway and vector database
+  ([PostgreSQL with pgvector](https://github.com/pgvector/pgvector))
 
 ## Testing
 
@@ -96,6 +142,10 @@ vendor/bin/phpunit --testsuite e2e  # end-to-end tests in a real browser
 ```
 
 ### End-to-End Tests
+
+> [!WARNING]
+> The end-to-end suite is inherited from upstream as is: it still expects OpenAI models, `OPENAI_API_KEY`
+> and the local PostgreSQL started with `docker compose up -d`, so it does not cover the amazee.ai setup yet.
 
 The `e2e` suite uses [Symfony Panther](https://github.com/symfony/panther) to click through all eleven
 use cases and assert the Symfony AI panel of the profiler for the very request the click triggered.

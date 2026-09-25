@@ -4,15 +4,15 @@ AI agent guidance for the Symfony AI demo application.
 
 ## Project Overview
 
-Symfony 8.0 demo application showcasing the Symfony AI components: RAG over the Symfony blog, streaming chat, multi-agent orchestration, voice/speech, image cropping, webcam video captioning, YouTube transcript Q&A, Wikipedia-grounded answers, a chat drawing its tools from remote MCP servers, a demo MCP server, and the AI Mate development CLI.
+Symfony 8.1 demo application, forked from symfony/ai-demo, showcasing the Symfony AI components with the amazee.ai platform (LLM gateway + pgvector database): RAG over the Symfony blog, streaming chat, multi-agent orchestration, voice/speech, image cropping, webcam video captioning, YouTube transcript Q&A, Wikipedia-grounded answers, a chat drawing its tools from remote MCP servers, a demo MCP server, and the AI Mate development CLI.
 
 ## Development Commands
 
 ### Setup
 ```bash
-docker compose up -d                          # Start PostgreSQL (pgvector)
 composer install
-echo "OPENAI_API_KEY='sk-...'" > .env.local   # HUGGINGFACE_API_KEY only if you wire HF agents
+php bin/console ai:amazee:configure you@example.com  # Writes AMAZEEAI_* credentials to .env.local
+# Optional keys in .env.local: OPENAI_API_KEY (Speech STT/TTS), MISTRAL_API_KEY (Document OCR), HUGGINGFACE_API_KEY (Crop)
 
 # Vector store must be set up before indexing
 symfony console ai:store:setup ai.store.postgres.symfony_blog
@@ -26,7 +26,7 @@ symfony serve -d                              # https://localhost:8000/
 ```bash
 vendor/bin/phpunit                            # All tests (config in phpunit.xml)
 vendor/bin/phpunit tests/SmokeTest.php        # Single test file
-vendor/bin/phpunit --testsuite e2e            # Panther browser tests, local only (see README.md)
+vendor/bin/phpunit --testsuite e2e            # Panther browser tests, local only; still targets OpenAI + local Docker Postgres
 vendor/bin/phpstan analyse                    # Static analysis (phpstan.dist.neon)
 # There is no enforced formatter in this package — php-cs-fixer is configured at the monorepo root.
 ```
@@ -52,9 +52,9 @@ symfony console app:blog:stream               # Streams the blog agent to the te
 ## Architecture
 
 ### AI Platforms
-`config/packages/ai.yaml` registers two platforms: `openai` and `huggingface`. Every agent currently routes to OpenAI — `blog` and `stream` on `gpt-4.1`, everything else (`youtube`, `recipe`, `wikipedia`, `mcp`, `speech`, `orchestrator`, `technical`, `fallback`) on `gpt-5-mini`. Speech also uses OpenAI `whisper-1` for STT and `tts-1` for TTS; the vectorizer uses `text-embedding-ada-002`. Hugging Face is configured but unused by any agent — wire it in explicitly if needed.
+`config/packages/ai.yaml` registers four platforms: `amazeeai`, `openai`, `huggingface` and `mistral`. Every chat agent routes to amazee.ai using region-independent model aliases: `chat` for most agents, `chat_with_complex_json` for the structured-output agents (`movies`, `recipe`). The vectorizer uses the `embeddings` alias (1024 dimensions, matching `setup_options.vector_size` of the store). amazee.ai models are discovered at runtime from the gateway's `/model/info` endpoint, list them with `curl -H "Authorization: Bearer $AMAZEEAI_LLM_KEY" $AMAZEEAI_LLM_API_URL/v1/models`. OpenAI is only used for Speech STT (`whisper-1`) and TTS (`tts-1`), Mistral for Document OCR, Hugging Face for Crop.
 
-The `Video` feature is the exception: `src/Video/TwigComponent.php` calls `PlatformInterface::invoke('gpt-5.2', ...)` directly (no agent in `ai.yaml`, no session, no tools) for one-shot webcam frame captioning.
+The `Video` feature is the exception: `src/Video/TwigComponent.php` calls `PlatformInterface::invoke('chat_with_image_vision', ...)` on `ai.platform.amazeeai` directly (no agent in `ai.yaml`, no session, no tools) for one-shot webcam frame captioning.
 
 ### Chat Feature Pattern
 Most user-facing features under `src/<Feature>/` are a trio:
@@ -65,12 +65,12 @@ Most user-facing features under `src/<Feature>/` are a trio:
 Features following this trio: `Blog`, `Stream`, `YouTube`, `Recipe`, `Wikipedia`, `Speech`, `Mcp`. Exceptions: `Video` (direct platform call, described above) and `Crop` (custom `CropForm` + `ImageCropper` rather than chat). Reset button clears the session key.
 
 ### RAG Pipeline (Blog)
-Index: RSS feed loader → `TextContainsFilter` (keeps only "Week of Symfony" posts, wired as `app.filter.week_of_symfony`) → `TextSplitTransformer` + `TextTrimTransformer` → OpenAI `text-embedding-ada-002` → pgvector store (`symfony_blog` table, cosine distance).
+Index: RSS feed loader → `TextContainsFilter` (keeps only "Week of Symfony" posts, wired as `app.filter.week_of_symfony`) → `TextSplitTransformer` + `TextTrimTransformer` → amazee.ai `embeddings` → amazee.ai pgvector store (`symfony_blog` table, cosine distance, DSN from `AMAZEEAI_VDB_*`).
 Retrieval: `SimilaritySearch` is constructed with `$retriever: '@ai.retriever.blog'` in `ai.yaml` services and exposed to the `blog` agent as a tool — the agent decides when to call it.
 The `blog` agent also attaches `App\Blog\SymfonyVersionsMemory` under `memory:` — memories are distinct from tools and are merged into context automatically.
 
 ### Multi-Agent Orchestration (`support`)
-`ai.multi_agent.support` defines an `orchestrator` that hands off to `technical` on keyword match (`bug`, `problem`, `technical`, `error`, `code`, `debug`) and otherwise falls through to `fallback`. All three are OpenAI `gpt-5-mini` single agents under `ai.agent.*`. Routing changes go under `ai.multi_agent`, model/prompt changes under `ai.agent`.
+`ai.multi_agent.support` defines an `orchestrator` that hands off to `technical` on keyword match (`bug`, `problem`, `technical`, `error`, `code`, `debug`) and otherwise falls through to `fallback`. All three are amazee.ai `chat` single agents under `ai.agent.*`. Routing changes go under `ai.multi_agent`, model/prompt changes under `ai.agent`.
 
 ### Speech Agent + Subagent Pattern
 The `speech` agent demonstrates two composition features:
