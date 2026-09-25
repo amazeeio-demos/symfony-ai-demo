@@ -270,7 +270,7 @@ abstract class E2ETestCase extends PantherTestCase
             return $wav;
         }
 
-        $mp3 = \dirname(__DIR__, 3).'/fixtures/audio.mp3';
+        $mp3 = \dirname(__DIR__, 2).'/fixtures/audio.mp3';
         if (!is_file($mp3) || null === (new ExecutableFinder())->find('ffmpeg')) {
             return null;
         }

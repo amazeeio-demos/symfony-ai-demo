@@ -18,7 +18,7 @@ use PHPUnit\Framework\TestCase;
 #[CoversClass(Movie::class)]
 final class MovieTest extends TestCase
 {
-    private const FIXTURES_DIR = __DIR__.'/../../../fixtures/movies';
+    private const FIXTURES_DIR = __DIR__.'/../../fixtures/movies';
 
     public function testFromFileParsesCloudAtlasFixture()
     {

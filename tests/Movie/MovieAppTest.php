@@ -21,7 +21,7 @@ use PHPUnit\Framework\TestCase;
 #[CoversClass(MovieApp::class)]
 final class MovieAppTest extends TestCase
 {
-    private const FIXTURES_DIR = __DIR__.'/../../../fixtures/movies';
+    private const FIXTURES_DIR = __DIR__.'/../../fixtures/movies';
 
     public function testRenderReturnsAllMoviesForEmptyQuery()
     {

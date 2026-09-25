@@ -20,7 +20,7 @@ use PHPUnit\Framework\TestCase;
 #[CoversClass(MovieSearch::class)]
 final class MovieSearchTest extends TestCase
 {
-    private const FIXTURES_DIR = __DIR__.'/../../../fixtures/movies';
+    private const FIXTURES_DIR = __DIR__.'/../../fixtures/movies';
 
     public function testEmptyQueryReturnsWholeCollection()
     {
