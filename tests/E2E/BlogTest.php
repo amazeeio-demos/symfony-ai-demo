@@ -34,11 +34,11 @@ final class BlogTest extends E2ETestCase
 
         // Two calls of the agent, plus the vectorization of the query by the similarity search.
         $panel->assertMetrics(platformCalls: 3, tools: 2, toolCalls: 1);
-        $panel->assertPlatformCall('gpt-4.1');
+        $panel->assertPlatformCall('chat', tokenUsage: false);
         $panel->assertToolRegistered('similarity_search');
         $panel->assertToolRegistered('clock');
 
-        $embedding = array_values(array_filter($panel->platformCalls(), static fn (array $call) => 'text-embedding-ada-002' === $call['model']));
+        $embedding = array_values(array_filter($panel->platformCalls(), static fn (array $call) => 'embeddings' === $call['model']));
         $this->assertCount(1, $embedding, 'Vectorization of the search query in Symfony AI panel');
         $this->assertStringContainsString('Vector with', $embedding[0]['result']);
     }
@@ -48,13 +48,13 @@ final class BlogTest extends E2ETestCase
      * having run the indexer beforehand.
      *
      * An existing index is left alone: the test needs *an* index, not a fresh one, and re-indexing
-     * would embed the whole blog through OpenAI again. StoreTest is the one rebuilding it.
+     * would embed the whole blog through amazee.ai again. StoreTest is the one rebuilding it.
      */
     #[Before]
     protected function ensureIndexedStore(): void
     {
         if (!Store::isAvailable()) {
-            $this->markTestSkipped('The database of the demo is not reachable, start it with "docker compose up -d".');
+            $this->markTestSkipped('The amazee.ai vector database is not reachable, run "php bin/console ai:amazee:configure".');
         }
 
         Store::setup();
@@ -66,6 +66,6 @@ final class BlogTest extends E2ETestCase
 
     protected function requiredApiKeys(): array
     {
-        return ['OPENAI_API_KEY'];
+        return ['AMAZEEAI_LLM_KEY'];
     }
 }

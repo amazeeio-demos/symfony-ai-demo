@@ -30,7 +30,7 @@ final class McpTest extends E2ETestCase
         $panel = $this->openAiPanel(platformCalls: 2);
 
         $panel->assertMetrics(platformCalls: 2, toolCalls: 1);
-        $panel->assertPlatformCall('gpt-5-mini');
+        $panel->assertPlatformCall('chat', tokenUsage: false);
 
         // One well-known tool per server: all three feed the same agent.
         $panel->assertToolRegistered('weather_get_weather');
@@ -40,6 +40,6 @@ final class McpTest extends E2ETestCase
 
     protected function requiredApiKeys(): array
     {
-        return ['OPENAI_API_KEY'];
+        return ['AMAZEEAI_LLM_KEY'];
     }
 }

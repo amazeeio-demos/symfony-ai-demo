@@ -12,7 +12,7 @@
 namespace App\Tests\E2E;
 
 /**
- * The microphone of the browser is faked by Chrome, which loops the audio fixture of the monorepo,
+ * The microphone of the browser is faked by Chrome, which loops the audio fixture in `fixtures/`,
  * see E2ETestCase. Without it, the speech-to-text model would only receive silence.
  *
  * @author Christopher Hertel <mail@christopher-hertel.de>
@@ -45,7 +45,7 @@ final class SpeechTest extends E2ETestCase
         $panel->assertMetrics(platformCalls: 3, tools: 3);
 
         $panel->assertPlatformCall('whisper-1', tokenUsage: false);
-        $panel->assertPlatformCall('gpt-5-mini');
+        $panel->assertPlatformCall('chat', tokenUsage: false);
         $panel->assertPlatformCall('tts-1', tokenUsage: false);
 
         // The blog agent is registered as subagent, next to the clock tool.
@@ -54,6 +54,6 @@ final class SpeechTest extends E2ETestCase
 
     protected function requiredApiKeys(): array
     {
-        return ['OPENAI_API_KEY'];
+        return ['AMAZEEAI_LLM_KEY', 'OPENAI_API_KEY'];
     }
 }

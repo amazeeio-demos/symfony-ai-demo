@@ -26,7 +26,7 @@ symfony serve -d                              # https://localhost:8000/
 ```bash
 vendor/bin/phpunit                            # All tests (config in phpunit.xml)
 vendor/bin/phpunit tests/SmokeTest.php        # Single test file
-vendor/bin/phpunit --testsuite e2e            # Panther browser tests, local only; still targets OpenAI + local Docker Postgres
+vendor/bin/phpunit --testsuite e2e            # Panther browser tests, local only (see README.md)
 vendor/bin/phpstan analyse                    # Static analysis (phpstan.dist.neon)
 # There is no enforced formatter in this package — php-cs-fixer is configured at the monorepo root.
 ```

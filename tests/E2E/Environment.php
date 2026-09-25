@@ -11,6 +11,7 @@
 
 namespace App\Tests\E2E;
 
+use Symfony\Component\Dotenv\Dotenv;
 use Symfony\Component\Process\ExecutableFinder;
 use Symfony\Component\Process\Process;
 
@@ -92,5 +93,26 @@ final class Environment
         $local = is_file($dotenv) ? (file_get_contents($dotenv) ?: '') : '';
 
         return 1 === preg_match('/^'.preg_quote($key, '/').'=\s*[\'"]?\S/m', $local);
+    }
+
+    /**
+     * The value the `dev` environment resolves for a variable, from the shell, `.env.local` or `.env`
+     * - for the credentials of the amazee.ai vector database, which this process needs itself.
+     */
+    public static function value(string $key): ?string
+    {
+        if (false !== $exported = getenv($key)) {
+            return '' === $exported ? null : $exported;
+        }
+
+        $values = [];
+        foreach (['.env', '.env.local'] as $file) {
+            $path = self::projectDirectory().'/'.$file;
+            if (is_file($path)) {
+                $values = [...$values, ...(new Dotenv())->parse(file_get_contents($path) ?: '', $path)];
+            }
+        }
+
+        return '' === ($values[$key] ?? '') ? null : $values[$key];
     }
 }

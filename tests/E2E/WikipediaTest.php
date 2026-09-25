@@ -34,7 +34,7 @@ final class WikipediaTest extends E2ETestCase
         $panel = $this->openAiPanel(platformCalls: 2);
 
         $panel->assertMetrics(platformCalls: 2, tools: 2, toolCalls: 1);
-        $panel->assertPlatformCall('gpt-5-mini');
+        $panel->assertPlatformCall('chat', tokenUsage: false);
         $panel->assertToolRegistered('wikipedia_search');
         $panel->assertToolRegistered('wikipedia_article');
 
@@ -44,6 +44,6 @@ final class WikipediaTest extends E2ETestCase
 
     protected function requiredApiKeys(): array
     {
-        return ['OPENAI_API_KEY'];
+        return ['AMAZEEAI_LLM_KEY'];
     }
 }

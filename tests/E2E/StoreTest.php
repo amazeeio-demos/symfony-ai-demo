@@ -16,7 +16,7 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * The indexing pipeline of the blog, driven through the console commands of the Store component:
- * the RSS feed of the Symfony blog is loaded, filtered, split, embedded by OpenAI and written into
+ * the RSS feed of the Symfony blog is loaded, filtered, split, embedded by amazee.ai and written into
  * the pgvector store - which is then searched again.
  *
  * Every stage of that has unit tests of its own in the Store component; what they cannot cover is
@@ -74,11 +74,11 @@ final class StoreTest extends TestCase
     protected function skipWithoutStore(): void
     {
         if (!Store::isAvailable()) {
-            $this->markTestSkipped('The database of the demo is not reachable, start it with "docker compose up -d".');
+            $this->markTestSkipped('The amazee.ai vector database is not reachable, run "php bin/console ai:amazee:configure".');
         }
 
-        if (!Environment::isConfigured('OPENAI_API_KEY')) {
-            $this->markTestSkipped('Set OPENAI_API_KEY in .env.local, or in your environment, to embed the blog posts.');
+        if (!Environment::isConfigured('AMAZEEAI_LLM_KEY')) {
+            $this->markTestSkipped('Run "php bin/console ai:amazee:configure" to embed the blog posts.');
         }
     }
 }

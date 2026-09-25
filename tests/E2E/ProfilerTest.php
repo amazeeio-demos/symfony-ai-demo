@@ -42,7 +42,7 @@ final class ProfilerTest extends E2ETestCase
         $this->assertCount(2, $calls);
 
         // First call: the conversation, resulting in the tool call of the agent.
-        $this->assertSame('gpt-4.1', $calls[0]['model']);
+        $this->assertSame('chat_with_complex_json', $calls[0]['model']);
         $this->assertStringContainsString('System:', $calls[0]['input']);
         $this->assertStringContainsString('User:', $calls[0]['input']);
         $this->assertStringContainsString('movie_search', $calls[0]['options']);
@@ -51,10 +51,8 @@ final class ProfilerTest extends E2ETestCase
         // Second call: the result of the tool is sent back to the model.
         $this->assertStringContainsString('Tool:', $calls[1]['input']);
 
-        // The platform reports the token usage of every call back as metadata.
-        foreach ($calls as $call) {
-            $this->assertStringContainsString('token_usage', $call['result']);
-        }
+        // No token usage metadata here: the amazee.ai bridge disables the token usage extractor that
+        // its Generic parent provides (CompletionsResultConverter::getTokenUsageExtractor() returns null).
 
         // The tool of the agent, and the actual call of it, are listed in their own sections.
         $panel->assertToolRegistered('movie_search');
@@ -78,6 +76,6 @@ final class ProfilerTest extends E2ETestCase
 
     protected function requiredApiKeys(): array
     {
-        return ['OPENAI_API_KEY'];
+        return ['AMAZEEAI_LLM_KEY'];
     }
 }

@@ -143,10 +143,6 @@ vendor/bin/phpunit --testsuite e2e  # end-to-end tests in a real browser
 
 ### End-to-End Tests
 
-> [!WARNING]
-> The end-to-end suite is inherited from upstream as is: it still expects OpenAI models, `OPENAI_API_KEY`
-> and the local PostgreSQL started with `docker compose up -d`, so it does not cover the amazee.ai setup yet.
-
 The `e2e` suite uses [Symfony Panther](https://github.com/symfony/panther) to click through all eleven
 use cases and assert the Symfony AI panel of the profiler for the very request the click triggered.
 Every test calls an AI platform for real, which costs money and takes time - the suite is therefore
@@ -158,13 +154,15 @@ Next to the setup above, it needs:
   downloads into `drivers/`. If only a Snap or Flatpak Chromium is installed, point Panther at it
   with `PANTHER_CHROME_BINARY` in `.env.test.local`.
 * **API keys** in `.env.local`, or exported in your environment - a test is skipped when the key of
-  its use case is missing: `OPENAI_API_KEY` for nine of them, `HUGGINGFACE_API_KEY` for the image
-  cropping, `MISTRAL_API_KEY` for the document OCR.
+  its use case is missing: `AMAZEEAI_*` from `ai:amazee:configure` for the amazee.ai ones (the blog
+  store is the amazee.ai vector database), plus `OPENAI_API_KEY` for the speech, `HUGGINGFACE_API_KEY`
+  for the image cropping, `MISTRAL_API_KEY` for the document OCR.
 * **ffmpeg** (optional) to convert the audio fixture for the fake microphone of the speech use case.
 
 The blog store does not need to be indexed beforehand: `StoreTest` drives the indexing pipeline
 through the console commands, and `BlogTest` sets the store up and indexes it when it is empty. Both
-skip themselves when the database is not running.
+skip themselves when the amazee.ai vector database is not reachable. Note that `StoreTest` drops and
+rebuilds the `symfony_blog` table.
 
 Panther boots the application in the **dev** environment, because the profiler - and with it the
 Symfony AI panel - only collects data with `kernel.debug` enabled. The web server therefore reads

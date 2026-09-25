@@ -29,6 +29,13 @@ final class VideoTest extends E2ETestCase
         // controller, which pushes it into the live component as data URL.
         $this->client->waitForVisibility('#videoFeed');
 
+        // Visible is not enough: until the fake webcam delivered its first frame, the controller
+        // cannot capture an image and silently drops the submit.
+        $this->client->wait(10)->until(
+            fn () => $this->client->executeScript('return document.getElementById("videoFeed").videoWidth > 0;') ?: null,
+            'Timeout waiting for the first frame of the webcam.'
+        );
+
         $this->chat('What do you see?');
 
         $caption = $this->waitForTextChange('#video-caption', self::PLACEHOLDER);
@@ -40,17 +47,17 @@ final class VideoTest extends E2ETestCase
 
         // This use case has no agent, but calls the platform directly - hence no tools either.
         $panel->assertMetrics(platformCalls: 1, toolCalls: 0);
-        $panel->assertPlatformCall('gpt-5.2');
+        $panel->assertPlatformCall('chat_with_image_vision', tokenUsage: false);
 
         // The frame is captioned in a single, one-shot call.
         $calls = $panel->platformCalls();
         $this->assertCount(1, $calls);
         $this->assertStringContainsString('User:', $calls[0]['input']);
-        $this->assertStringContainsString('max_output_tokens', $calls[0]['options']);
+        $this->assertStringContainsString('max_tokens', $calls[0]['options']);
     }
 
     protected function requiredApiKeys(): array
     {
-        return ['OPENAI_API_KEY'];
+        return ['AMAZEEAI_LLM_KEY'];
     }
 }

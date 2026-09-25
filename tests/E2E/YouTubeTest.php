@@ -39,7 +39,7 @@ final class YouTubeTest extends E2ETestCase
         $panel = $this->openAiPanel();
 
         $panel->assertMetrics(platformCalls: 1, toolCalls: 0);
-        $panel->assertPlatformCall('gpt-5-mini');
+        $panel->assertPlatformCall('chat', tokenUsage: false);
 
         // Without tools, the agent answers in a single call - the transcript is handed over to the
         // model as system message.
@@ -50,6 +50,6 @@ final class YouTubeTest extends E2ETestCase
 
     protected function requiredApiKeys(): array
     {
-        return ['OPENAI_API_KEY'];
+        return ['AMAZEEAI_LLM_KEY'];
     }
 }

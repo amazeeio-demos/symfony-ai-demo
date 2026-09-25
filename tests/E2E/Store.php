@@ -17,15 +17,15 @@ use Symfony\Component\Process\Process;
 /**
  * The vector store of the blog, driven through the console commands of the Store component.
  *
- * The commands run in the `dev` environment, against the PostgreSQL of the Docker setup and the
- * real embeddings of OpenAI - the same store the browser then queries through the blog agent.
+ * The commands run in the `dev` environment, against the amazee.ai vector database and the real
+ * embeddings of amazee.ai - the same store the browser then queries through the blog agent.
  *
  * @author Christopher Hertel <mail@christopher-hertel.de>
  */
 final class Store
 {
     /**
-     * Indexing the Symfony blog embeds every post through OpenAI, which takes a while.
+     * Indexing the Symfony blog embeds every post through amazee.ai, which takes a while.
      */
     private const int INDEX_TIMEOUT = 600;
 
@@ -126,19 +126,17 @@ final class Store
 
     private static function connect(): ?\PDO
     {
-        Environment::expose();
+        $host = Environment::value('AMAZEEAI_VDB_HOST');
 
-        $url = parse_url($_ENV['DATABASE_URL'] ?? $_SERVER['DATABASE_URL'] ?? '');
-
-        if (!\is_array($url) || !isset($url['host'])) {
+        if (null === $host) {
             return null;
         }
 
         try {
             return new \PDO(
-                \sprintf('pgsql:host=%s;port=%d;dbname=%s', $url['host'], $url['port'] ?? 5432, ltrim($url['path'] ?? '', '/')),
-                urldecode($url['user'] ?? ''),
-                urldecode($url['pass'] ?? ''),
+                \sprintf('pgsql:host=%s;port=%d;dbname=%s', $host, Environment::value('AMAZEEAI_VDB_PORT') ?? 5432, Environment::value('AMAZEEAI_VDB_NAME') ?? ''),
+                Environment::value('AMAZEEAI_VDB_USER'),
+                Environment::value('AMAZEEAI_VDB_PASSWORD'),
             );
         } catch (\PDOException) {
             return null;

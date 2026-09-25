@@ -33,7 +33,7 @@ final class MoviesTest extends E2ETestCase
 
         // The agent calls the platform twice: once resulting in the tool call, once with its result.
         $panel->assertMetrics(platformCalls: 2, tools: 1, toolCalls: 1);
-        $panel->assertPlatformCall('gpt-4.1');
+        $panel->assertPlatformCall('chat_with_complex_json', tokenUsage: false);
         $panel->assertToolRegistered('movie_search');
         $this->assertStringContainsString('movie_search', $panel->platformCalls()[0]['result']);
 
@@ -47,6 +47,6 @@ final class MoviesTest extends E2ETestCase
 
     protected function requiredApiKeys(): array
     {
-        return ['OPENAI_API_KEY'];
+        return ['AMAZEEAI_LLM_KEY'];
     }
 }
