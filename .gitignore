@@ -26,3 +26,5 @@ phpstan.neon
 ###< symfony/panther ###
 
 pgdata
+
+*.idea
