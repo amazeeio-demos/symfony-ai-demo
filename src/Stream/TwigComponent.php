@@ -42,7 +42,7 @@ final class TwigComponent extends AbstractController
      */
     public function getMessages(): array
     {
-        return $this->chat->loadMessages()->withoutSystemMessage()->getMessages();
+        return $this->chat->loadMessages()->withoutSystemMessage()->withoutToolMessages()->getMessages();
     }
 
     #[LiveAction]
@@ -65,16 +65,20 @@ final class TwigComponent extends AbstractController
 
     public function streamContent(Request $request): EventStreamResponse
     {
+        // The chat is kept in a session-scoped cache, so load the messages while the real
+        // session is still available.
         $messages = $this->chat->loadMessages();
 
         $actualSession = $request->getSession();
 
-        // Overriding session will prevent the framework calling save() on the actual session.
-        // This fixes "Failed to start the session because headers have already been sent" error.
+        // Overriding the session prevents the framework from calling save() on the actual
+        // session, which fixes the "Failed to start the session because headers have already
+        // been sent" error once the streamed body has started sending output.
         $request->setSession(new Session(new MockArraySessionStorage()));
 
         return new EventStreamResponse(function () use ($request, $actualSession, $messages) {
             $request->setSession($actualSession);
+
             $response = $this->chat->getAssistantResponse($messages);
 
             foreach ($response as $partialMessage) {

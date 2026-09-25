@@ -28,7 +28,7 @@ final class SmokeTest extends WebTestCase
 
         $this->assertResponseIsSuccessful();
         $this->assertSelectorTextContains('h1', 'Welcome to the Symfony AI Demo');
-        $this->assertSelectorCount(8, '.card');
+        $this->assertSelectorCount(11, '.demo-card');
     }
 
     #[DataProvider('provideChats')]
@@ -39,7 +39,7 @@ final class SmokeTest extends WebTestCase
 
         $this->assertResponseIsSuccessful();
         $this->assertSelectorTextSame('h4', $expectedHeadline);
-        $this->assertSelectorCount(1, '.card-footer button');
+        $this->assertSelectorCount(1, '.chat-form button');
     }
 
     /**
@@ -50,6 +50,20 @@ final class SmokeTest extends WebTestCase
         yield 'Blog' => ['/blog', 'Retrieval Augmented Generation based on the Symfony blog'];
         yield 'Recipe' => ['/recipe', 'Cooking Recipes'];
         yield 'Wikipedia' => ['/wikipedia', 'Wikipedia Research'];
+        yield 'MCP' => ['/mcp', 'Remote MCP Servers'];
         yield 'YouTube' => ['/youtube', 'Chat about a YouTube Video'];
+        yield 'Document' => ['/document', 'Chat about a Document'];
+    }
+
+    public function testCrop()
+    {
+        $client = static::createClient();
+        $client->request('GET', '/crop');
+
+        $this->assertResponseIsSuccessful();
+        $this->assertSelectorTextContains('.chat-name', 'Smart Image Cropping');
+        $this->assertSelectorCount(3, 'input[name="ratio"]');
+        $this->assertSelectorCount(4, 'input[name="width"]');
+        $this->assertSelectorCount(5, 'button[data-live-action-param="selectPreset"]');
     }
 }

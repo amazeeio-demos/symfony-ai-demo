@@ -25,18 +25,6 @@
             "src/Repository/.gitignore"
         ]
     },
-    "php-cs-fixer/shim": {
-        "version": "3.55",
-        "recipe": {
-            "repo": "github.com/symfony/recipes",
-            "branch": "main",
-            "version": "3.0",
-            "ref": "16422bf8eac6c3be42afe07d37e2abc89d2bdf6b"
-        },
-        "files": [
-            ".php-cs-fixer.dist.php"
-        ]
-    },
     "php-http/discovery": {
         "version": "1.20",
         "recipe": {
@@ -79,7 +67,7 @@
         ]
     },
     "symfony/ai-amazee-ai-platform": {
-        "version": "0.7",
+        "version": "0.14",
         "recipe": {
             "repo": "github.com/symfony/recipes",
             "branch": "main",
@@ -115,7 +103,7 @@
         ]
     },
     "symfony/ai-generic-platform": {
-        "version": "0.7",
+        "version": "0.10",
         "recipe": {
             "repo": "github.com/symfony/recipes",
             "branch": "main",
@@ -136,6 +124,18 @@
         },
         "files": [
             "config/packages/ai_hugging_face_platform.yaml"
+        ]
+    },
+    "symfony/ai-mistral-platform": {
+        "version": "0.10",
+        "recipe": {
+            "repo": "github.com/symfony/recipes",
+            "branch": "main",
+            "version": "0.1",
+            "ref": "2487d366905f51cc768093e51385be66c3d38f76"
+        },
+        "files": [
+            "config/packages/ai_mistral_platform.yaml"
         ]
     },
     "symfony/ai-open-ai-platform": {
@@ -283,6 +283,15 @@
             "config/packages/monolog.yaml"
         ]
     },
+    "symfony/panther": {
+        "version": "2.4",
+        "recipe": {
+            "repo": "github.com/symfony/recipes",
+            "branch": "main",
+            "version": "1.0",
+            "ref": "eac1868f830a3e332764bb3919ab02311b3340c8"
+        }
+    },
     "symfony/property-info": {
         "version": "7.3",
         "recipe": {
@@ -398,9 +407,6 @@
         "files": [
             "config/packages/twig_component.yaml"
         ]
-    },
-    "symfony/ux-typed": {
-        "version": "v2.22.0"
     },
     "symfony/web-profiler-bundle": {
         "version": "7.0",

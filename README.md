@@ -1,123 +1,194 @@
 # Symfony AI - Demo Application using amazee.ai
 
-Symfony application demoing Symfony AI components with the amazee.ai VDB and LLM providers.
+Symfony application demoing [Symfony AI](https://symfony.com/doc/current/ai/index.html) components with the
+[amazee.ai](https://amazee.ai/) Private AI Gateway: LLMs and a managed pgvector database, in the region you choose.
+
+This is a fork of [symfony/ai-demo](https://github.com/symfony/ai-demo) where every chat use case runs through
+amazee.ai.
 
 ## Quick start
 
-Install dependencies
-
-```bash
+```shell
+git clone https://github.com/amazeeio-demos/symfony-ai-demo.git
+cd symfony-ai-demo
 composer install
-```
 
-Require amazee.ai credentials,
-this will populate the environment variables.
+# Sends a code to your email, then writes the LLM and vector database credentials to .env.local
+php bin/console ai:amazee:configure you@example.com
 
-```bash
-php bin/console ai:amazee:configure user@example.com
-```
+# Index the Symfony blog into the amazee.ai vector database
+php bin/console ai:store:setup ai.store.postgres.symfony_blog
+php bin/console ai:store:index blog -vv
 
-Start the server
-
-```bash
 symfony serve -d
 ```
+
+Open https://localhost:8000/ and start chatting.
+
+> [!NOTE]
+> Without the [Symfony CLI](https://symfony.com/download), use `php -S 127.0.0.1:8000 -t public`
+> (set `PHP_CLI_SERVER_WORKERS=4` so streamed answers don't block other requests) and open http://127.0.0.1:8000/.
 
 ## Examples
 
 ![demo.png](demo.png)
 
+| Use case     | Provider                                         | Model                         |
+|--------------|--------------------------------------------------|-------------------------------|
+| YouTube      | amazee.ai                                        | `chat`                        |
+| Recipe       | amazee.ai                                        | `chat_with_complex_json`      |
+| Movies       | amazee.ai                                        | `chat_with_complex_json`      |
+| Wikipedia    | amazee.ai                                        | `chat`                        |
+| MCP          | amazee.ai                                        | `chat`                        |
+| Symfony Blog | amazee.ai (LLM + vector database)                | `chat` · `embeddings`         |
+| Video        | amazee.ai                                        | `chat_with_image_vision`      |
+| Turbo Stream | amazee.ai                                        | `chat`                        |
+| Speech       | amazee.ai + OpenAI for speech-to-text and text-to-speech | `whisper-1` · `chat` · `tts-1` |
+| Document OCR | Mistral                                          | `mistral-ocr-latest` · `mistral-medium-latest` |
+| Smart Crop   | Hugging Face                                     | `facebook/detr-resnet-50`     |
+
+## Models
+
+`chat`, `chat_with_complex_json`, `chat_with_image_vision` and `embeddings` are aliases that amazee.ai
+resolves in each region, so the demo works whichever region you pick.
+You can use any model your key has access to instead, by changing the `model` of an agent
+in `config/packages/ai.yaml`. List the available models with:
+
+```shell
+curl -s -H "Authorization: Bearer $AMAZEEAI_LLM_KEY" "$AMAZEEAI_LLM_API_URL/v1/models"
+```
+
+The platform bridge discovers these models and their capabilities from the gateway's `/model/info` endpoint,
+so no model catalog needs to be maintained in the application.
+
+> [!IMPORTANT]
+> The vector table is created with `vector_size: 1024`, which matches `embeddings` (Mistral Embed).
+> If you switch to an embedding model with other dimensions, update `setup_options.vector_size` in
+> `config/packages/ai.yaml`, then run `ai:store:drop`, `ai:store:setup` and `ai:store:index` again.
+
 ## Requirements
 
-What you need to run this demo:
+* [PHP >= 8.4](https://www.php.net/releases/8.4/en.php) with the `gd`, `intl` and `pdo_pgsql` extensions
+* [Composer](https://getcomposer.org/)
+* An email address to sign in to [amazee.ai](https://amazee.ai/) with `ai:amazee:configure`
+* Optional: the [Symfony CLI](https://symfony.com/download)
+* Optional: [Node.js](https://nodejs.org/), only for the MCP example: one of its three servers speaks the
+  legacy HTTP+SSE transport and is reached through `npx mcp-remote`
+* Optional API keys, in `.env.local`, for the use cases that are not served by amazee.ai:
+  * `OPENAI_API_KEY`: speech-to-text and text-to-speech of the Speech example
+  * `MISTRAL_API_KEY`: Document OCR
+  * `HUGGINGFACE_API_KEY`: Smart Crop
 
-* Internet Connection
-* Terminal & Browser
-* [Git](https://git-scm.com/) & [GitHub Account](https://github.com)
-* [Docker](https://www.docker.com/) with [Docker Compose Plugin](https://docs.docker.com/compose/)
-* Your Favorite IDE or Editor
-* Optional: an [OpenAI API Key](https://platform.openai.com/docs/api-reference/create-and-export-an-api-key) - for Speech STT/TTS only
+## Configuration
+
+`ai:amazee:configure` writes the following to `.env.local`:
+
+```dotenv
+AMAZEEAI_LLM_KEY=sk-...
+AMAZEEAI_LLM_API_URL=https://llm.[region].amazee.ai
+AMAZEEAI_VDB_HOST=vectordb1.[region].amazee.ai
+AMAZEEAI_VDB_PORT=5432
+AMAZEEAI_VDB_NAME=db_abcd1234
+AMAZEEAI_VDB_USER=user_abcd1234
+AMAZEEAI_VDB_PASSWORD=...
+```
+
+`AMAZEEAI_VDB_DSN` is composed from these in `.env`. Check the result with `php bin/console debug:dotenv`.
+
+In production (`APP_ENV=prod`), the command stores `AMAZEEAI_LLM_KEY` and `AMAZEEAI_VDB_PASSWORD` as
+[Symfony secrets](https://symfony.com/doc/current/configuration/secrets.html) instead.
+
+The platform, vector store and agents are wired in `config/packages/ai.yaml`:
+
+```yaml
+ai:
+    platform:
+        amazeeai:
+            base_url: '%env(AMAZEEAI_LLM_API_URL)%'
+            api_key: '%env(AMAZEEAI_LLM_KEY)%'
+    agent:
+        blog:
+            platform: 'ai.platform.amazeeai'
+            model: 'chat'
+    store:
+        postgres:
+            symfony_blog:
+                dsn: '%env(AMAZEEAI_VDB_DSN)%'
+                username: '%env(AMAZEEAI_VDB_USER)%'
+                password: '%env(AMAZEEAI_VDB_PASSWORD)%'
+```
+
+To use amazee.ai in your own project:
+
+```shell
+composer require symfony/ai-bundle symfony/ai-amazee-ai-platform amazeeio/symfony-amazeeai-configure
+php bin/console ai:amazee:configure you@example.com
+```
 
 ## Technology
 
-This small demo sits on top of following technologies:
-
 * [PHP >= 8.4](https://www.php.net/releases/8.4/en.php)
-* [Symfony 8.0 incl. Twig, Asset Mapper & UX](https://symfony.com/)
-* [Bootstrap 5](https://getbootstrap.com/docs/5.0/getting-started/introduction/)
-* [amazee.ai](https://amazee.ai/)
-* [PostgreSQL with pgvector](https://github.com/pgvector/pgvector)
-* [FrankenPHP](https://frankenphp.dev/)
+* [Symfony 8.1 incl. Twig, Asset Mapper & UX](https://symfony.com/)
+* [Symfony AI](https://symfony.com/doc/current/ai/index.html) with the
+  [amazee.ai platform bridge](https://github.com/symfony/ai-amazee-ai-platform)
+* [amazee.ai](https://amazee.ai/) LLM gateway and vector database
+  ([PostgreSQL with pgvector](https://github.com/pgvector/pgvector))
 
-## Setup
-
-The setup is split into three parts, the Symfony application, the OpenAI configuration, and initializing PostgreSQL.
-
-### 1. Symfony App
-
-Checkout the repository, start the docker environment and install dependencies:
+## Testing
 
 ```shell
-git clone git@github.com:symfony/ai-demo.git
-cd ai-demo
-composer install
-symfony serve -d
+vendor/bin/phpunit                  # unit and integration tests
+vendor/bin/phpunit --testsuite e2e  # end-to-end tests in a real browser
 ```
 
-Now you should be able to open https://localhost:8000/ in your browser,
-and the chatbot UI should be available for you to start chatting.
+### End-to-End Tests
 
-> [!NOTE]
-> You might have to bypass the security warning of your browser with regard to self-signed certificates.
+> [!WARNING]
+> The end-to-end suite is inherited from upstream as is: it still expects OpenAI models, `OPENAI_API_KEY`
+> and the local PostgreSQL started with `docker compose up -d`, so it does not cover the amazee.ai setup yet.
 
-### 2. OpenAI Configuration
+The `e2e` suite uses [Symfony Panther](https://github.com/symfony/panther) to click through all eleven
+use cases and assert the Symfony AI panel of the profiler for the very request the click triggered.
+Every test calls an AI platform for real, which costs money and takes time - the suite is therefore
+excluded from the default one, and meant to be run locally.
 
-**Optional** for speech only.
+Next to the setup above, it needs:
 
-For using GPT and embedding models from OpenAI, you need to configure an OpenAI API key as environment variable.
-This requires you to have an OpenAI account, create a valid API key and set it as `OPENAI_API_KEY` in `.env.local` file.
+* **Chrome or Chromium** with a matching `chromedriver`, which `vendor/bin/bdi detect drivers`
+  downloads into `drivers/`. If only a Snap or Flatpak Chromium is installed, point Panther at it
+  with `PANTHER_CHROME_BINARY` in `.env.test.local`.
+* **API keys** in `.env.local`, or exported in your environment - a test is skipped when the key of
+  its use case is missing: `OPENAI_API_KEY` for nine of them, `HUGGINGFACE_API_KEY` for the image
+  cropping, `MISTRAL_API_KEY` for the document OCR.
+* **ffmpeg** (optional) to convert the audio fixture for the fake microphone of the speech use case.
+
+The blog store does not need to be indexed beforehand: `StoreTest` drives the indexing pipeline
+through the console commands, and `BlogTest` sets the store up and indexes it when it is empty. Both
+skip themselves when the database is not running.
+
+Panther boots the application in the **dev** environment, because the profiler - and with it the
+Symfony AI panel - only collects data with `kernel.debug` enabled. The web server therefore reads
+the real API keys from `.env.local` itself. Chrome fakes camera and microphone, so the video and
+speech use cases run without a human in front of the screen.
 
 ```shell
-echo "OPENAI_API_KEY='sk-...'" > .env.local
+vendor/bin/phpunit --testsuite e2e --filter BlogTest      # a single use case
+PANTHER_NO_HEADLESS=1 vendor/bin/phpunit --testsuite e2e  # watch the browser
 ```
 
-Verify the success of this step by running the following command:
-
-```shell
-symfony console debug:dotenv
-```
-
-You should be able to see the `OPENAI_API_KEY` in the list of environment variables.
-
-### 3. PostgreSQL Vector Store Initialization
-
-[PostgreSQL with pgvector](https://github.com/pgvector/pgvector) is used to store embeddings of the chatbot's context.
-
-To initialize the vector store, you need to run the following command:
-
-```shell
-symfony console ai:store:setup ai.store.postgres.symfony_blog
-symfony console ai:store:index blog -vv
-```
-
-Now you should be able to retrieve documents from the store:
-
-```shell
-symfony console ai:store:retrieve blog "Week of Symfony"
-```
-
-**Don't forget to set up the project in your favorite IDE or editor.**
+Screenshots of failing tests are written to `var/error-screenshots/`.
 
 ## Functionality
 
-* The chatbot application is a simple and small Symfony 8.0 application.
+* The chatbot application is a simple and small Symfony 8.1 application.
 * The UI is coupled to a [Twig LiveComponent](https://symfony.com/bundles/ux-live-component/current/index.html), that integrates different `Chat` implementations on top of the user's session.
-* You can reset the chat context by hitting the `Reset` button in the top right corner.
-* You find three different usage scenarios in the upper navbar.
+* You can reset the chat context by hitting the `Reset chat` button in the top right corner.
+* You find eleven different usage scenarios in the upper navbar.
 
 ### MCP
 
-Demo MCP server added with a `current-time` tool to return the current time, with an optional format string.
+Demo MCP server exposing a `current-time` tool and a **Movies** MCP App — an interactive HTML UI (`#[AsMcpApp]`)
+that renders the movie collection as a searchable grid in hosts supporting [MCP Apps](https://github.com/modelcontextprotocol/ext-apps).
 
 To add the server, add the following configuration to your MCP Client's settings, e.g. your IDE:
 ```json
@@ -166,10 +237,11 @@ npx @modelcontextprotocol/inspector php bin/console mcp:server
 
 Which opens a web UI to interactively test the MCP server.
 
-## AI Mate - MCP Development Assistant
+## AI Mate - Development CLI
 
-[Symfony AI Mate](https://github.com/symfony/ai-mate) is an MCP (Model Context Protocol) server that provides AI
-assistants with Symfony-specific development capabilities.
+[Symfony AI Mate](https://github.com/symfony/ai-mate) is a command-line assistant that gives coding
+agents Symfony-specific knowledge about this application. There is no server to start: the agent
+runs `vendor/bin/mate` like any other command.
 
 ### Installation & Setup
 
@@ -186,29 +258,25 @@ vendor/bin/mate init
 vendor/bin/mate discover
 ```
 
-### MCP Client Configuration
+`mate init` writes the instructions your agent reads (`mate/AGENT_INSTRUCTIONS.md` plus a managed
+block in `AGENTS.md`, imported by `CLAUDE.md`) and installs the skills into `.agents/skills/`, with
+a mirror in `.claude/skills/`. No client-specific configuration file is involved.
 
-The `mcp.json` file in the project root enables automatic MCP client detection:
+### Running Tools
 
-```json
-{
-  "mcpServers": {
-    "symfony-ai-mate": {
-      "command": "./vendor/bin/mate",
-      "args": ["serve"]
-    }
-  }
-}
+```shell
+vendor/bin/mate tools:list                            # what is available
+vendor/bin/mate tools:inspect symfony-ai-features     # parameters and JSON input schema
+vendor/bin/mate tools:call symfony-ai-features        # run it
+vendor/bin/mate tools:call symfony-profiler-list --limit=1
 ```
-
-For other projects, add AI Mate to your MCP client settings (e.g., `~/.claude/mcp.json`, IDE settings, etc.).
 
 ### Custom Capability Example
 
-This demo includes a **`symfony-ai-features`** tool (see `mate/SymfonyAiFeaturesTool.php`) that analyzes the project's
+This demo includes a **`symfony-ai-features`** tool (see `mate/src/SymfonyAiFeaturesTool.php`) that analyzes the project's
 AI configuration and reports all available platforms, agents, tools, stores, and packages.
 
-**Try it in your MCP-enabled chat:**
+**Try it in your coding agent:**
 
 > "Which Symfony AI features are available in this demo?"
 >
@@ -220,17 +288,11 @@ AI configuration and reports all available platforms, agents, tools, stores, and
 >
 > "Is the php extension intl installed?"
 
-The AI assistant will use the `symfony-ai-features` and other MCP tool to provide detailed information about project
-internals.
+The agent will call `symfony-ai-features` and the other Mate tools to answer from the project
+itself rather than from reading the code.
 
 ### Creating Custom Tools
 
-Create tools in `mate/src/` and register them in `mate/config.php`. See the
+Add a class with a public method carrying `#[MateTool]` under `mate/src/`, then run
+`composer dump-autoload` and verify with `vendor/bin/mate tools:list`. See the
 [AI Mate documentation](https://symfony.com/doc/current/ai/components/mate.html) for detailed guides.
-
-### Testing
-
-```shell
-# Test with MCP Inspector
-npx @modelcontextprotocol/inspector ./vendor/bin/mate serve
-```

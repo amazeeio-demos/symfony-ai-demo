@@ -1,0 +1,73 @@
+{% import '_message.html.twig' as message %}
+{% set messages = this.messages %}
+
+<section class="chat" {{ attributes.defaults(stimulus_controller('document')) }}>
+    {{ include('_chat_header.html.twig', { demo: demos.document }) }}
+    <div id="chat-body" class="chat-body">
+        {% if this.activeTitle %}
+            <div class="alert chat-context">
+                <span>We're discussing: <strong>{{ this.activeTitle }}</strong></span>
+                <a href="{{ this.activeUrl }}" target="_blank" rel="noopener" title="Open the document in a new window">Open the document ↗</a>
+            </div>
+        {% endif %}
+        {% for message in messages %}
+            {% include '_message.html.twig' with { message, latest: loop.last } %}
+        {% else %}
+            <div id="welcome" class="message message-bot">
+                <span class="bot avatar">{{ ux_icon('bot') }}</span>
+                <div class="welcome-content">
+                    <h4>Chat about a Document</h4>
+                    <p>Pick a document, or provide your own, and I extract its text with Mistral OCR to answer your questions about it.</p>
+                    <div class="welcome-form">
+                        {% if error %}
+                            <div class="alert alert-danger mb-0" role="alert">{{ error }}</div>
+                        {% endif %}
+                        <label for="document-sample" class="visually-hidden">Document</label>
+                        <select id="document-sample" data-model="sample" class="form-select">
+                            <option value="">— Choose a document —</option>
+                            {% for s in this.samples %}
+                                <option value="{{ s.url }}">{{ s.title }}</option>
+                            {% endfor %}
+                            <option value="__own__">I'll provide my own URL…</option>
+                        </select>
+
+                        {% if sample == '__own__' %}
+                            <input autofocus type="url" id="document-url"
+                                   data-model="norender|url"
+                                   class="form-control" placeholder="https://example.com/document.pdf">
+                        {% elseif sample %}
+                            <p class="welcome-hint">
+                                <a href="{{ sample }}" target="_blank" rel="noopener">Open this document in a new window ↗</a>
+                                to see what it is - then start the chat and ask away.
+                            </p>
+                        {% endif %}
+
+                        <form {{ live_action('start:prevent') }}>
+                            <button class="button button-primary" id="chat-start" {{ not sample ? 'disabled' }} data-loading="action(start)|addAttribute(disabled)">
+                                <span data-loading="action(start)|hide">Start</span>
+                                <span data-loading="action(start)|show"><span class="spinner-border spinner-border-sm me-1"></span>Reading</span>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+        <div id="loading-message" class="d-none">
+            {{ message.user([{text:''}]) }}
+            {{ message.bot('The Document OCR Bot is reading the document ...', true) }}
+        </div>
+    </div>
+    <div class="chat-composer">
+        <form class="chat-form" {{ live_action('submit:prevent') }}>
+            <input id="chat-message" {{ messages is empty ? 'disabled' }}
+                   data-model="norender|message"
+                   data-loading="action(submit)|addAttribute(disabled)"
+                   type="text" class="chat-input" placeholder="{{ messages is empty ? 'Start with a document first ...' : 'Ask about the document ...' }}" autocomplete="off">
+            <span class="chat-hint">↵ send</span>
+            <button class="chat-send" aria-label="Send" {{ messages is empty ? 'disabled' }} data-loading="action(submit)|addAttribute(disabled)">
+                <span data-loading="action(submit)|hide">{{ ux_icon('send') }}</span>
+                <span data-loading="action(submit)|show" class="spinner-border spinner-border-sm"></span>
+            </button>
+        </form>
+    </div>
+</section>

@@ -1,0 +1,58 @@
+{% import '_message.html.twig' as message %}
+{% set messages = this.messages %}
+
+<section class="chat" {{ attributes.defaults(stimulus_controller('movies')) }}>
+    {{ include('_chat_header.html.twig', { demo: demos.movies }) }}
+    <div id="chat-body" class="chat-body">
+        {% for msg in messages %}
+            {% include '_message.html.twig' with { message: msg, latest: loop.last } %}
+            {% if msg.role.value == 'assistant' %}
+                {% set suggestions = this.getMoviesFor(msg) %}
+                {% if suggestions is not empty %}
+                    <div class="movie-suggestions d-flex flex-wrap gap-3">
+                        {% for suggestion in suggestions %}
+                            <figure class="movie-suggestion mb-0 text-center">
+                                <button type="button"
+                                        class="movie-poster-btn"
+                                        title="{{ suggestion.reason }}"
+                                        {{ live_action('showDetails', { slug: suggestion.movie.slug }) }}>
+                                    {% include 'components/_movie_poster.html.twig' with { movie: suggestion.movie, aspect: '1 / 1', showText: false } only %}
+                                </button>
+                                <figcaption class="movie-poster-caption small mt-2">
+                                    <span class="fw-semibold d-block">{{ suggestion.movie.title }}</span>
+                                    {% if suggestion.movie.year %}<span class="text-muted">{{ suggestion.movie.year }}</span>{% endif %}
+                                </figcaption>
+                            </figure>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endif %}
+        {% else %}
+            {{ message.welcome('Chat about movies', 'Search for movies in our collection by title, director, cast or vibe - matching movies appear as cards.') }}
+        {% endfor %}
+        <div id="loading-message" class="d-none">
+            {{ message.user([{text:''}]) }}
+            {{ message.bot('The Movie Bot is browsing the collection ...', true) }}
+        </div>
+    </div>
+    {% set detailMovie = this.detailMovie %}
+    {% if detailMovie %}
+        <div class="movie-modal-overlay">
+            <button type="button" class="movie-modal-backdrop" {{ live_action('closeDetails') }} aria-label="Close details"></button>
+            <div class="movie-modal-panel">
+                <button type="button" class="movie-modal-close" {{ live_action('closeDetails') }} aria-label="Close">&times;</button>
+                {{ component('movie_card', { movie: detailMovie }) }}
+            </div>
+        </div>
+    {% endif %}
+    <div class="chat-composer" data-controller="chat-prompt">
+        {% if messages is empty %}
+            {{ include('_chat_prompts.html.twig', { prompts: ['Movies by Christopher Nolan', 'Something with Tom Hanks', 'Something for a cozy evening'] }) }}
+        {% endif %}
+        <form class="chat-form" {{ live_action('submit:prevent') }}>
+            <input autofocus id="chat-message" data-model="norender|message" type="text" class="chat-input" placeholder="What kind of movie are you looking for?" autocomplete="off">
+            <span class="chat-hint">↵ send</span>
+            <button class="chat-send" aria-label="Send">{{ ux_icon('send') }}</button>
+        </form>
+    </div>
+</section>

@@ -11,21 +11,24 @@
 
 namespace App\Stream;
 
+use Psr\Cache\CacheItemPoolInterface;
 use Symfony\AI\Agent\AgentInterface;
 use Symfony\AI\Platform\Message\AssistantMessage;
 use Symfony\AI\Platform\Message\Message;
 use Symfony\AI\Platform\Message\MessageBag;
+use Symfony\AI\Platform\Message\Role;
 use Symfony\AI\Platform\Message\UserMessage;
-use Symfony\AI\Platform\Result\Stream\Delta\TextDelta;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\RequestStack;
 
 final class Chat
 {
-    private const SESSION_KEY = 'stream-chat';
+    private const CACHE_PREFIX = 'stream-chat-';
+    private const CACHE_TTL = 3600;
 
     public function __construct(
         private readonly RequestStack $requestStack,
+        private readonly CacheItemPoolInterface $cache,
         #[Autowire(service: 'ai.agent.stream')]
         private readonly AgentInterface $agent,
     ) {
@@ -33,7 +36,9 @@ final class Chat
 
     public function loadMessages(): MessageBag
     {
-        return $this->requestStack->getSession()->get(self::SESSION_KEY, new MessageBag());
+        $item = $this->cache->getItem($this->cacheKey());
+
+        return $item->isHit() ? $item->get() : new MessageBag();
     }
 
     public function submitMessage(string $message): UserMessage
@@ -53,14 +58,19 @@ final class Chat
      */
     public function getAssistantResponse(MessageBag $messages): \Generator
     {
-        $stream = $this->agent->call($messages, ['stream' => true])->getContent();
-        \assert(is_iterable($stream));
+        // Only answer when the latest message is still awaiting a reply. This guards against
+        // reconnecting, duplicate or stale SSE connections (e.g. after a stream error or a
+        // reset) that would otherwise call the model with no pending user message and trigger
+        // a provider "input required" error.
+        if (!$messages->isLastMessageFrom(Role::User)) {
+            return Message::ofAssistant('');
+        }
+
+        $execution = $this->agent->call($messages, ['stream' => true]);
 
         $response = '';
-        foreach ($stream as $delta) {
-            if ($delta instanceof TextDelta) {
-                yield $response .= (string) $delta;
-            }
+        foreach ($execution->asTextStream() as $delta) {
+            yield $response .= $delta;
         }
 
         $assistantMessage = Message::ofAssistant($response);
@@ -72,11 +82,19 @@ final class Chat
 
     public function reset(): void
     {
-        $this->requestStack->getSession()->remove(self::SESSION_KEY);
+        $this->cache->deleteItem($this->cacheKey());
     }
 
     private function saveMessages(MessageBag $messages): void
     {
-        $this->requestStack->getSession()->set(self::SESSION_KEY, $messages);
+        $item = $this->cache->getItem($this->cacheKey());
+        $item->set($messages)->expiresAfter(self::CACHE_TTL);
+
+        $this->cache->save($item);
+    }
+
+    private function cacheKey(): string
+    {
+        return self::CACHE_PREFIX.$this->requestStack->getSession()->getId();
     }
 }

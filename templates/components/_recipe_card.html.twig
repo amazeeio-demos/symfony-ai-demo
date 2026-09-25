@@ -1,0 +1,53 @@
+<h2 class="recipe-title">{{ recipe.name }}</h2>
+<div class="row g-4">
+    <div class="col-md-4">
+        <div class="recipe-facts">
+            {% if recipe.duration %}
+                <div class="recipe-fact">
+                    {{ ux_icon('clock') }}
+                    <strong>{{ recipe.duration }}</strong>
+                    <span>minutes</span>
+                </div>
+            {% endif %}
+            {% if recipe.level %}
+                <div class="recipe-fact">
+                    {{ ux_icon('difficulty') }}
+                    <strong>{{ recipe.level }}</strong>
+                    <span>difficulty</span>
+                </div>
+            {% endif %}
+            {% if recipe.diet %}
+                <div class="recipe-fact">
+                    {{ ux_icon('vegetarian') }}
+                    <strong>{{ recipe.diet }}</strong>
+                    <span>diet</span>
+                </div>
+            {% endif %}
+        </div>
+
+        <h5 class="recipe-heading">{{ ux_icon('ingredients') }} Ingredients</h5>
+        <div class="d-flex flex-wrap gap-2">
+            {% for ingredient in recipe.ingredients %}
+                <span class="badge recipe-ingredient">
+                    <strong>{{ ingredient.name }}</strong>
+                    <small>{{ ingredient.quantity }}</small>
+                </span>
+            {% endfor %}
+        </div>
+    </div>
+    <div class="col-md-8">
+        <h5 class="recipe-heading">{{ ux_icon('steps') }} Instructions</h5>
+        <ol class="recipe-steps">
+            {% for step in recipe.steps %}
+                <li>{{ step }}</li>
+            {% endfor %}
+        </ol>
+        <div class="recipe-share">
+            <span>Share this recipe</span>
+            <button class="button button-outline" {{ live_action('openShare') }}>
+                {{ ux_icon('email') }}
+                Share
+            </button>
+        </div>
+    </div>
+</div>

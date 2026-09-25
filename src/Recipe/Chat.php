@@ -12,19 +12,22 @@
 namespace App\Recipe;
 
 use App\Recipe\Data\Recipe;
+use Psr\Cache\CacheItemPoolInterface;
 use Symfony\AI\Agent\AgentInterface;
 use Symfony\AI\Platform\Message\Message;
 use Symfony\AI\Platform\Message\MessageBag;
-use Symfony\AI\Platform\Result\ObjectResult;
+use Symfony\AI\Platform\Message\Role;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\RequestStack;
 
 final class Chat
 {
-    private const SESSION_KEY = 'recipe-chat';
+    private const CACHE_PREFIX = 'recipe-chat-';
+    private const CACHE_TTL = 3600;
 
     public function __construct(
         private readonly RequestStack $requestStack,
+        private readonly CacheItemPoolInterface $cache,
         #[Autowire(service: 'ai.agent.recipe')]
         private readonly AgentInterface $agent,
     ) {
@@ -52,33 +55,79 @@ final class Chat
         $messages = $this->loadMessages();
 
         $messages->add(Message::ofUser($message));
-        $result = $this->agent->call($messages, ['response_format' => Recipe::class]);
-
-        \assert($result instanceof ObjectResult);
-
-        $recipe = $result->getContent();
-
-        \assert($recipe instanceof Recipe);
-
-        $assistantMessage = Message::ofAssistant($recipe->toString());
-        $assistantMessage->getMetadata()->add('recipe', $result->getContent());
-        $messages->add($assistantMessage);
 
         $this->saveMessages($messages);
     }
 
-    public function reset(): void
+    /**
+     * Whether the latest user message is still awaiting its recipe, i.e. a stream
+     * should be (or is being) consumed for it.
+     */
+    public function isAwaitingRecipe(): bool
     {
-        $this->requestStack->getSession()->remove(self::SESSION_KEY);
+        return $this->loadMessages()->isLastMessageFrom(Role::User);
     }
 
-    private function loadMessages(): MessageBag
+    /**
+     * Streams the recipe as it is generated, yielding a progressively populated Recipe
+     * for each partial snapshot and persisting the final recipe to the chat store.
+     *
+     * @return \Generator<int, Recipe, void, Recipe>
+     */
+    public function getRecipeStream(MessageBag $messages): \Generator
     {
-        return $this->requestStack->getSession()->get(self::SESSION_KEY, new MessageBag());
+        // Only generate a recipe when the latest message is still awaiting one. This guards
+        // against reconnecting, duplicate or stale SSE connections (e.g. after a stream error
+        // or a reset) that would otherwise call the model with no pending user message and
+        // trigger a provider "input required" error.
+        if (!$messages->isLastMessageFrom(Role::User)) {
+            return new Recipe();
+        }
+
+        $execution = $this->agent->call($messages, [
+            'stream' => true,
+            'response_format' => Recipe::class,
+        ]);
+
+        $recipe = new Recipe();
+        foreach ($execution->asStreamedObject() as $partial) {
+            \assert($partial instanceof Recipe);
+            $recipe = $partial;
+
+            yield $recipe;
+        }
+
+        $assistantMessage = Message::ofAssistant($recipe->toString());
+        $assistantMessage->getMetadata()->add('recipe', $recipe);
+        $messages->add($assistantMessage);
+
+        $this->saveMessages($messages);
+
+        return $recipe;
+    }
+
+    public function reset(): void
+    {
+        $this->cache->deleteItem($this->cacheKey());
+    }
+
+    public function loadMessages(): MessageBag
+    {
+        $item = $this->cache->getItem($this->cacheKey());
+
+        return $item->isHit() ? $item->get() : new MessageBag();
     }
 
     private function saveMessages(MessageBag $messages): void
     {
-        $this->requestStack->getSession()->set(self::SESSION_KEY, $messages);
+        $item = $this->cache->getItem($this->cacheKey());
+        $item->set($messages)->expiresAfter(self::CACHE_TTL);
+
+        $this->cache->save($item);
+    }
+
+    private function cacheKey(): string
+    {
+        return self::CACHE_PREFIX.$this->requestStack->getSession()->getId();
     }
 }

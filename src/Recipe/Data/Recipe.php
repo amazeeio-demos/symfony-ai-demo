@@ -11,42 +11,42 @@
 
 namespace App\Recipe\Data;
 
-use Symfony\AI\Platform\Contract\JsonSchema\Attribute\With;
+use Symfony\AI\Platform\Contract\JsonSchema\Attribute\Schema;
 
 final class Recipe
 {
     /**
      * @var string Name of the recipe
      */
-    public string $name;
+    public ?string $name = null;
 
     /**
      * @var int Duration in minutes
      */
-    #[With(minimum: 5, maximum: 240)]
-    public int $duration;
+    #[Schema(minimum: 5, maximum: 240)]
+    public ?int $duration = null;
 
     /**
      * @var string Difficulty level of the recipe
      */
-    #[With(enum: ['Beginner', 'Intermediate', 'Advanced'])]
-    public string $level;
+    #[Schema(enum: ['Beginner', 'Intermediate', 'Advanced'])]
+    public ?string $level = null;
 
     /**
      * @var string Dietary preference
      */
-    #[With(enum: ['Vegetarian', 'Vegan', 'Gluten-Free', 'Keto', 'Paleo'])]
-    public string $diet;
+    #[Schema(enum: ['Vegetarian', 'Vegan', 'Gluten-Free', 'Keto', 'Paleo'])]
+    public ?string $diet = null;
 
     /**
      * @var Ingredient[] List of ingredients
      */
-    public array $ingredients;
+    public array $ingredients = [];
 
     /**
      * @var string[] Cooking instructions
      */
-    public array $steps;
+    public array $steps = [];
 
     public function toString(): string
     {

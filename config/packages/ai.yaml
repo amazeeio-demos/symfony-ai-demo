@@ -1,16 +1,25 @@
 ai:
     platform:
-        openai:
-            api_key: '%env(OPENAI_API_KEY)%' # kept for Speech STT/TTS only
         amazeeai:
             base_url: '%env(AMAZEEAI_LLM_API_URL)%'
             api_key: '%env(AMAZEEAI_LLM_KEY)%'
+        # Optional: only used for Speech STT/TTS
+        openai:
+            api_key: '%env(OPENAI_API_KEY)%'
         huggingface:
             api_key: '%env(HUGGINGFACE_API_KEY)%'
+        mistral:
+            api_key: '%env(MISTRAL_API_KEY)%'
     agent:
+        document:
+            platform: 'ai.platform.mistral'
+            model: 'mistral-medium-latest'
+            # The system prompt is built dynamically in App\Document\Chat::start(), where the
+            # OCR-extracted text is injected, so no static prompt is configured here.
+            tools: false
         blog:
             platform: 'ai.platform.amazeeai'
-            model: 'claude-3-5-sonnet'
+            model: 'chat'
             prompt: |
                 You are an helpful assistant that knows about the latest blog content of the Symfony's framework website.
                 To search for content you use the tool 'similarity_search' for generating the answer. Only use content
@@ -25,26 +34,44 @@ ai:
                   method: 'now'
             memory:
                 service: 'App\Blog\SymfonyVersionsMemory'
+        movies:
+            platform: 'ai.platform.amazeeai'
+            model: 'chat_with_complex_json'
+            prompt: |
+                You are a friendly movie expert helping users discover films from a curated collection.
+
+                To find movies you always use the 'movie_search' tool - never rely on your own memory and never
+                invent movies. Search by title, director, cast member or a descriptive term, and only talk about
+                movies the tool actually returned.
+
+                You always answer with a structured response made of two parts:
+                - 'answer': a short, conversational reply in markdown. Introduce your picks and add helpful context,
+                  but do not repeat the full plot or cast - those are shown on the movie cards.
+                - 'movies': the movies backing your answer, each referenced by the exact 'slug' returned by the tool,
+                  together with a one-sentence 'reason' why it fits. Leave this list empty when no movie is relevant
+                  (e.g. small-talk or no match) and say so in the answer.
+            tools:
+                - 'App\Movies\MovieSearch'
         stream:
             platform: 'ai.platform.amazeeai'
-            model: 'claude-3-5-sonnet'
+            model: 'chat'
             prompt:
                 file: '%kernel.project_dir%/prompts/stream-chat.txt'
             tools: false
         youtube:
             platform: 'ai.platform.amazeeai'
-            model: 'claude-3-5-sonnet'
+            model: 'chat'
             tools: false
         recipe:
             platform: 'ai.platform.amazeeai'
-            model: 'claude-3-5-sonnet'
+            model: 'chat_with_complex_json'
             prompt:
                 text: 'You are a helpful cooking assistant. Provide detailed recipes based on user requests.'
             tools: false
         wikipedia:
             platform: 'ai.platform.amazeeai'
             model:
-                name: 'claude-3-5-sonnet'
+                name: 'chat'
             prompt:
                 text: |
                     Please answer the users question based on Wikipedia, only use information provided in the messages.
@@ -54,8 +81,8 @@ ai:
                 - 'Symfony\AI\Agent\Bridge\Wikipedia\Wikipedia'
             include_sources: true
         speech:
-            platform: 'ai.platform.openai'
-            model: 'gpt-5-mini'
+            platform: 'ai.platform.amazeeai'
+            model: 'chat'
             prompt: |
                 You are a friendly, positive and energetic voice assistant. You can engage in light discussions, ask
                 questions, and do general small-talk. If asked about the Symfony Framework or their community events,
@@ -78,20 +105,41 @@ ai:
                 tts_options:
                     voice: 'coral'
                     instructions: 'Speak in a cheerful and positive tone.'
+        mcp:
+            platform: 'ai.platform.amazeeai'
+            model: 'chat'
+            prompt:
+                text: |
+                    You are a helpful assistant that answers questions about live football, the New York City
+                    subway and the weather. All of that knowledge comes from remote MCP servers you are connected
+                    to - never answer from memory, always call the matching tool first, and say so if a tool
+                    gives you nothing.
+
+                    Prefixes tell you which server a tool belongs to: 'livescore_' for football, 'transit_' for
+                    the subway and 'weather_' for the weather. Some tools need an exact identifier, so look it up
+                    with a search tool before you use it.
+
+                    Answer in markdown and keep it short. The weather server draws its rain radar as text
+                    characters, so wrap that map in a fenced code block to keep it readable.
+                include_tools: true
+            tools:
+                - { mcp_server: 'remotes.livescore' }
+                - { mcp_server: 'remotes.transit' }
+                - { mcp_server: 'remotes.weather' }
         # Multi-agent setup
         orchestrator:
             platform: 'ai.platform.amazeeai'
-            model: 'claude-3-5-sonnet'
+            model: 'chat'
             prompt: 'You are an intelligent agent orchestrator that routes user questions to specialized agents.'
             tools: false
         technical:
             platform: 'ai.platform.amazeeai'
-            model: 'claude-3-5-sonnet'
+            model: 'chat'
             prompt: 'You are a technical support specialist. Help users resolve bugs, problems, and technical errors.'
             tools: false
         fallback:
             platform: 'ai.platform.amazeeai'
-            model: 'claude-3-5-sonnet'
+            model: 'chat'
             prompt: 'You are a helpful general assistant. Assist users with any questions or tasks they may have.'
             tools: false
     multi_agent:
@@ -109,10 +157,13 @@ ai:
                 table_name: 'symfony_blog'
                 vector_field: 'embedding'
                 distance: 'cosine'
+                setup_options:
+                    # Must match the dimensions of the vectorizer model ('embeddings' resolves to mistral-embed)
+                    vector_size: 1024
     vectorizer:
         amazeeai:
             platform: 'ai.platform.amazeeai'
-            model: 'titan-embed-text-v2:0'
+            model: 'embeddings'
     indexer:
         blog:
             loader: 'Symfony\AI\Store\Document\Loader\RssFeedLoader'
